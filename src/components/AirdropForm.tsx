@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import InputField from "@/ui/InputField";
 import { chainsToTSender, tsenderAbi, erc20Abi } from "@/constants";
 import { useChainId, useConfig, useAccount, useWriteContract } from "wagmi";
@@ -19,6 +19,27 @@ export default function AidropForm(){
     const account = useAccount();
     const { data:hash, isPending, writeContractAsync} = useWriteContract();
     // const approvalReceipt = waitForTransactionReceipt();
+
+    useEffect(() => {
+        const tempAddress = localStorage.getItem("tokenAddress");
+        const tempRecipients = localStorage.getItem("recipients");
+        const tempAmount = localStorage.getItem("amount");
+
+        if(tempAddress)
+            setTokenAddress(tempAddress);
+        if(tempRecipients)
+            setRecipients(tempRecipients);
+        if(tempAmount)
+            setAmount(tempAmount);
+        
+    }, []);
+
+    // Not sure better like this or make them individuals
+    useEffect(() => {
+        localStorage.setItem("tokenAddress", tokenAddress);
+        localStorage.setItem("recipients", recipients);
+        localStorage.setItem("amount", amount);
+    },[tokenAddress, recipients, amount]);
 
     async function getApprovedAmount(tSenderAddress: string | null): Promise<number> {
         if(!tSenderAddress){
@@ -50,6 +71,7 @@ export default function AidropForm(){
                 functionName : "approve",
                 args: [tSenderAddress as `0x${string}`, BigInt(total)]
             })
+            
             const approvalReceipt = await waitForTransactionReceipt(config, {
                 hash: approvalHash as `0x${string}`
             })
