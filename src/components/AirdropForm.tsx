@@ -163,7 +163,7 @@ export default function AidropForm() {
                 large={true}
             />
             <TransactionDetails
-                tokenName={functionReturn?.[0]?.result as string}
+                tokenName={(functionReturn?.[0]?.result as string) ?? "Unknown"}
                 totalTokenInWei={total}
                 totalTokenInEther={tokenInEther(total)}
             />
