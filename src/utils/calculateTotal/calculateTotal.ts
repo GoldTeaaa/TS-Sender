@@ -19,4 +19,5 @@ export function calculateTotal(amounts: string): number {
     return amountArray
       .filter(num => !isNaN(num)) // Keep only valid numbers
       .reduce((sum, num) => sum + num, 0); // Sum them, starting from 0
-  }
+}
+
