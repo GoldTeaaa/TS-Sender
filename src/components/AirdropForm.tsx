@@ -8,20 +8,27 @@ import { useChainId, useConfig, useAccount, useWriteContract, useReadContract, u
 import { readContract, waitForTransactionReceipt, readContracts } from "@wagmi/core";
 import { calculateTotal } from "@/utils";
 import { formatEther } from "viem";
+import { ClipLoader } from "react-spinners";
+import Spinner from "@/ui/SpinnerIcon";
 
 export default function AidropForm() {
     const [tokenAddress, setTokenAddress] = useState("");
     const [recipients, setRecipients] = useState("");
     const [amount, setAmount] = useState("");
+    const [isPending, setIsPending] = useState(false);
+    const [isConfirming, setIsConfirming] = useState(false);
+    const [isConfirmed, setIsConfirmed] = useState(false);
+    type txStatus =  "neutral" | "pending" | "confirming" | "confirmed" | "error";
+    const [txStatus, setTxStatus] = useState<txStatus>("neutral");
 
     const total: number = useMemo(() => calculateTotal(amount), [amount]);
     // useMemo(() => console.log(calculateTotal(amount)), [amount])
     const chainId = useChainId();
     const config = useConfig();
     const account = useAccount();
-    const { data: hash, isPending, writeContractAsync } = useWriteContract();
+    const { writeContractAsync } = useWriteContract();
     // const approvalReceipt = waitForTransactionReceipt();
-    const {data: functionReturn, isLoading: isLoadingFunctionReturn, error} = useReadContracts({ //this return an array
+    const {data: functionReturn, isLoading, error} = useReadContracts({ //this return an array
         contracts: [
             {
                 address: tokenAddress as `0x${string}`,
@@ -48,7 +55,6 @@ export default function AidropForm() {
             setRecipients(tempRecipients);
         if (tempAmount)
             setAmount(tempAmount);
-
     }, []);
 
     // Not sure better like this or make them individuals
@@ -58,11 +64,6 @@ export default function AidropForm() {
         localStorage.setItem("recipients", recipients);
         localStorage.setItem("amount", amount);
     }, [tokenAddress, recipients, amount]); //dependecies to trigger setItem when one of this changed
-
-    //Update the Transaction Details when the input is updated
-    useEffect(() => {
-        
-    }, [tokenAddress])
 
     async function getApprovedAmount(tSenderAddress: string | null): Promise<number> {
         if (!tSenderAddress) {
@@ -85,55 +86,87 @@ export default function AidropForm() {
         const tSenderAddress = chainsToTSender[chainId]["tsender"];
         const approvedAmount = await getApprovedAmount(tSenderAddress);
         console.log("Approved amount: ", approvedAmount);
+        const formatedRecipients = recipients.split(/[,\n]+/).map(addr => addr.trim()).filter(Boolean);
+        const formatedAmounts = amount.split(/[,\n]+/).map(amt => amt.trim()).filter(Boolean);
 
-        if (total > approvedAmount) {
-            //Initiate function call to blockchain and return a hash as proof of approval
+        try {
+          if (total > approvedAmount) {
+            setTxStatus("pending");
             const approvalHash = await writeContractAsync({
-                abi: erc20Abi,
-                address: tokenAddress as `0x${string}`,
-                functionName: "approve",
-                args: [tSenderAddress as `0x${string}`, BigInt(total)]
-            })
-
+              abi: erc20Abi,
+              address: tokenAddress as `0x${string}`,
+              functionName: "approve",
+              args: [tSenderAddress as `0x${string}`, BigInt(total)],
+            });
+      
+            setTxStatus("confirming");
             const approvalReceipt = await waitForTransactionReceipt(config, {
-                hash: approvalHash as `0x${string}`
-            })
+              hash: approvalHash as `0x${string}`,
+            });
             console.log("Approval confirmed: ", approvalReceipt);
-
-            //refactor this when there is time
+      
             const airdropHash = await writeContractAsync({
-                abi: tsenderAbi,
-                address: tSenderAddress as `0x${string}`,
-                functionName: "airdropERC20",
-                args: [
-                    tokenAddress,
-                    // Comma or new line separated
-                    recipients.split(/[,\n]+/).map(addr => addr.trim()).filter(addr => addr !== ''),
-                    amount.split(/[,\n]+/).map(amt => amt.trim()).filter(amt => amt !== ''),
-                    BigInt(total), //Convert to erc20 decimals
-                ]
-            })
-            console.log("Airdrop confirmed with hash: ", airdropHash);
-            console.log(total);
-
-        }
-        else {
+              abi: tsenderAbi,
+              address: tSenderAddress as `0x${string}`,
+              functionName: "airdropERC20",
+              args: [
+                tokenAddress,
+                formatedRecipients,
+                formatedAmounts,
+                BigInt(total),
+              ],
+            });
+      
+            const airdropReceipt = await waitForTransactionReceipt(config, {
+              hash: airdropHash as `0x${string}`,
+            });
+      
+            console.log("Airdrop confirmed with hash: ", airdropReceipt);
+            setTxStatus("confirmed");
+          } else {
+            setTxStatus("pending");
             const airdropHash = await writeContractAsync({
-                abi: tsenderAbi,
-                address: tSenderAddress as `0x${string}`,
-                functionName: "airdropERC20",
-                args: [
-                    tokenAddress,
-                    // Comma or new line separated
-                    recipients.split(/[,\n]+/).map(addr => addr.trim()).filter(addr => addr !== ''),
-                    amount.split(/[,\n]+/).map(amt => amt.trim()).filter(amt => amt !== ''),
-                    BigInt(total),
-                ]
-            })
-            console.log(total);
-            console.log("Airdrop confirmed with hash: ", airdropHash);
+              abi: tsenderAbi,
+              address: tSenderAddress as `0x${string}`,
+              functionName: "airdropERC20",
+              args: [
+                tokenAddress,
+                formatedRecipients,
+                formatedAmounts,
+                BigInt(total),
+              ],
+            });
+      
+            setTxStatus("confirming");
+            const airdropReceipt = await waitForTransactionReceipt(config, {
+              hash: airdropHash as `0x${string}`,
+            });
+      
+            console.log("Airdrop confirmed with hash: ", airdropReceipt);
+            setTxStatus("confirmed");
+          }
+        } catch (error) {
+          console.error("Transaction failed:", error);
+          setTxStatus("error");
         }
+      }
+      
 
+    function getState(state:string) {
+        switch(state){
+            case "neutral":
+                return <span>Send Transactions</span>
+            case "pending":
+                return <span className="flex items-center gap-2"><Spinner/>Confirming in wallet...</span>
+            case "confirming":
+                return <span className="flex items-center gap-2"><Spinner/>Mining Transaction....</span>
+            case "confirmed":
+                return <span>Transaction Confirmed!</span>
+            case "error":
+                return <span>Transaction Failed</span>
+            default:
+                return <span>Send Transactions</span>
+        }
     }
 
     function tokenInEther(tokenAmount: number) {
@@ -141,7 +174,7 @@ export default function AidropForm() {
     }
 
     return (
-        <div>
+        <div className="flex flex-col gap-4 max-w-xl mx-auto mt-10 p-6 bg-white rounded-lg shadow-md space-y-4">
             <InputField
                 label="Token Address"
                 placeholder="0x"
@@ -163,16 +196,16 @@ export default function AidropForm() {
                 large={true}
             />
             <TransactionDetails
-                tokenName={functionReturn?.[0]?.result as string}
+                tokenName={(functionReturn?.[0]?.result as string) ?? "Unknown"}
                 totalTokenInWei={total}
                 totalTokenInEther={tokenInEther(total)}
             />
-            <br />
             <button
                 onClick={handleSubmit}
-                className="bg-yellow-400 hover:bg-yellow-500 text-white font-semibold py-2 px-4 rounded shadow"
+                className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-10 rounded shadow"
+                disabled={isPending || isConfirming}
             >
-                Submit
+                {getState(txStatus)}
             </button>
 
         </div>
