@@ -47,7 +47,8 @@ node_modules/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
-
+ feature/InputFields
 
 # Synpress
 .cache-synpress/
+
