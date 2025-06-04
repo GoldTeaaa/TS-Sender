@@ -5,7 +5,6 @@
 
 3. Deploy to fleek
 
-
-https://github.com/Cyfrin/ts-tsender-ui-cu
-https://github.com/Cyfrin/TSender/
+Vercel Link:
+```https://ts-sender-git-main-greenteaas-projects.vercel.app```
 
