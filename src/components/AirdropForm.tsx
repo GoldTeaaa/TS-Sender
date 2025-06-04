@@ -55,7 +55,6 @@ export default function AidropForm() {
             setRecipients(tempRecipients);
         if (tempAmount)
             setAmount(tempAmount);
-
     }, []);
 
     // Not sure better like this or make them individuals
@@ -87,7 +86,9 @@ export default function AidropForm() {
         const tSenderAddress = chainsToTSender[chainId]["tsender"];
         const approvedAmount = await getApprovedAmount(tSenderAddress);
         console.log("Approved amount: ", approvedAmount);
-      
+        const formatedRecipients = recipients.split(/[,\n]+/).map(addr => addr.trim()).filter(Boolean);
+        const formatedAmounts = amount.split(/[,\n]+/).map(amt => amt.trim()).filter(Boolean);
+
         try {
           if (total > approvedAmount) {
             setTxStatus("pending");
@@ -110,8 +111,8 @@ export default function AidropForm() {
               functionName: "airdropERC20",
               args: [
                 tokenAddress,
-                recipients.split(/[,\n]+/).map(addr => addr.trim()).filter(Boolean),
-                amount.split(/[,\n]+/).map(amt => amt.trim()).filter(Boolean),
+                formatedRecipients,
+                formatedAmounts,
                 BigInt(total),
               ],
             });
@@ -130,8 +131,8 @@ export default function AidropForm() {
               functionName: "airdropERC20",
               args: [
                 tokenAddress,
-                recipients.split(/[,\n]+/).map(addr => addr.trim()).filter(Boolean),
-                amount.split(/[,\n]+/).map(amt => amt.trim()).filter(Boolean),
+                formatedRecipients,
+                formatedAmounts,
                 BigInt(total),
               ],
             });
@@ -154,7 +155,7 @@ export default function AidropForm() {
     function getState(state:string) {
         switch(state){
             case "neutral":
-                return <span>Send Trasactions</span>
+                return <span>Send Transactions</span>
             case "pending":
                 return <span className="flex items-center gap-2"><Spinner/>Confirming in wallet...</span>
             case "confirming":
@@ -173,7 +174,7 @@ export default function AidropForm() {
     }
 
     return (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 max-w-xl mx-auto mt-10 p-6 bg-white rounded-lg shadow-md space-y-4">
             <InputField
                 label="Token Address"
                 placeholder="0x"
